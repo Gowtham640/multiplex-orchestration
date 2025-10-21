@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabaseclient";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -187,5 +187,19 @@ export default function AuthPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-8 sm:p-20">
+        <div className="w-full max-w-sm rounded-xl bg-neutral-900 p-6 text-white shadow-lg">
+          <p className="text-center text-neutral-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AuthForm />
+    </Suspense>
   );
 }
