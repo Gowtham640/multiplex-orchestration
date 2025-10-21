@@ -22,15 +22,16 @@ export default function AuthPage() {
       if (!code) return;
       try {
         setLoading(true);
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
         // Clean the URL and move to sign-in (or redirect if you prefer)
         window.history.replaceState({}, '', '/auth?mode=signin');
         setMessage(type === 'signup' ? 'Email confirmed. You can now sign in.' : 'You are signed in.');
         setMode('signin');
-      } catch (e: any) {
+      } catch (e: unknown) {
         // If exchange fails, keep them on sign-in with an info message
-        setError(e?.message || 'Could not verify email link. Try signing in.');
+        const errorMessage = e instanceof Error ? e.message : 'Could not verify email link. Try signing in.'
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -73,8 +74,9 @@ export default function AuthPage() {
         }
         router.push('/home');
       }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -161,7 +163,7 @@ export default function AuthPage() {
         <p className="mt-4 text-center text-sm text-neutral-400">
           {mode === 'signin' ? (
             <>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button type="button" className="underline" onClick={() => setMode('signup')}>Sign up</button>
             </>
           ) : (

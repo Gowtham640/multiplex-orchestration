@@ -5,7 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     // Use service role key to bypass any RLS issues
     const supabase = supabaseServiceKey 
@@ -114,8 +114,9 @@ export async function GET(req: Request) {
 
     console.log('Final movies:', movies.length)
     return NextResponse.json({ movies })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

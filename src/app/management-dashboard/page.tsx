@@ -1,8 +1,9 @@
 'use client'
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseclient";
 import { useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
 
 type TabKey =
   | 'overview'
@@ -15,11 +16,37 @@ type TabKey =
   | 'settings'
   | 'support';
 
+type Screen = {
+  id: number;
+  screen_number: number;
+  total_rows: number;
+  total_columns: number;
+  removed: Set<string>;
+  history: string[];
+};
+
+type Show = {
+  id: number;
+  theatre_id: string;
+  screen_id: number;
+  movie_name: string;
+  language: string | null;
+  show_date: string;
+  start_time: string;
+  end_time: string;
+  ticket_price: number;
+  available_seats: number;
+  created_at: string;
+  screens: {
+    screen_number: number;
+  };
+};
+
 export default function ManagementDashboardPage() {
   const [active, setActive] = useState<TabKey>('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,8 +74,9 @@ export default function ManagementDashboardPage() {
         }
         
         setLoading(false);
-      } catch (e: any) {
-        setError(e.message || 'Access denied');
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : 'Access denied'
+        setError(errorMessage);
         setLoading(false);
       }
     }
@@ -200,9 +228,9 @@ function Overview() {
 }
 
 // 2) Movies / Shows
-function MoviesShows({ session }: { session: any }) {
-  const [shows, setShows] = useState<any[]>([]);
-  const [screens, setScreens] = useState<any[]>([]);
+function MoviesShows({ session }: { session: Session | null }) {
+  const [shows, setShows] = useState<Show[]>([]);
+  const [screens, setScreens] = useState<Screen[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState({
     screen_id: '',
@@ -214,15 +242,7 @@ function MoviesShows({ session }: { session: any }) {
     ticket_price: ''
   });
 
-  // Load shows and screens on component mount
-  useEffect(() => {
-    if (session) {
-      loadShows();
-      loadScreens();
-    }
-  }, [session]);
-
-  const loadShows = async () => {
+  const loadShows = useCallback(async () => {
     if (!session?.access_token) return;
     
     try {
@@ -236,9 +256,9 @@ function MoviesShows({ session }: { session: any }) {
     } catch (e) {
       console.error('Failed to load shows:', e);
     }
-  };
+  }, [session?.access_token]);
 
-  const loadScreens = async () => {
+  const loadScreens = useCallback(async () => {
     if (!session?.access_token) return;
     
     try {
@@ -252,7 +272,15 @@ function MoviesShows({ session }: { session: any }) {
     } catch (e) {
       console.error('Failed to load screens:', e);
     }
-  };
+  }, [session?.access_token]);
+
+  // Load shows and screens on component mount
+  useEffect(() => {
+    if (session) {
+      loadShows();
+      loadScreens();
+    }
+  }, [session, loadShows, loadScreens]);
 
   const calculateEndTime = (startTime: string, durationMinutes: number) => {
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -449,19 +477,12 @@ function MoviesShows({ session }: { session: any }) {
 }
 
 // 3) Screens / Theatre Setup
-function ScreensSetup({ session }: { session: any }) {
-  const [screens, setScreens] = useState<{ id: number; screen_number: number; total_rows: number; total_columns: number; removed: Set<string>; history: string[] }[]>([]);
+function ScreensSetup({ session }: { session: Session | null }) {
+  const [screens, setScreens] = useState<Screen[]>([]);
   const [newScreen, setNewScreen] = useState({ screen_number: 1, rows: 10, cols: 20 });
   const [loading, setLoading] = useState(false);
 
-  // Load screens on component mount
-  useEffect(() => {
-    if (session) {
-      loadScreens();
-    }
-  }, [session]);
-
-  const loadScreens = async () => {
+  const loadScreens = useCallback(async () => {
     if (!session?.access_token) return;
     
     try {
@@ -470,7 +491,7 @@ function ScreensSetup({ session }: { session: any }) {
       });
       if (res.ok) {
         const { screens: data } = await res.json();
-        setScreens(data.map((s: any) => ({ 
+        setScreens(data.map((s: Screen) => ({ 
           ...s, 
           removed: new Set(), 
           history: [] 
@@ -479,7 +500,14 @@ function ScreensSetup({ session }: { session: any }) {
     } catch (e) {
       console.error('Failed to load screens:', e);
     }
-  };
+  }, [session?.access_token]);
+
+  // Load screens on component mount
+  useEffect(() => {
+    if (session) {
+      loadScreens();
+    }
+  }, [session, loadScreens]);
 
   const addScreen = async () => {
     if (!newScreen.screen_number || !newScreen.rows || !newScreen.cols) return;
@@ -886,11 +914,6 @@ const inputClass = "w-full rounded-md border border-transparent bg-neutral-900 p
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const { className, ...rest } = props;
   return <input className={`${inputClass} ${className || ''}`} {...rest} />;
-}
-
-function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { className, ...rest } = props;
-  return <textarea className={`${inputClass} ${className || ''}`} {...rest} />;
 }
 
 
