@@ -32,8 +32,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, message: 'Confirmation email sent' })
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 

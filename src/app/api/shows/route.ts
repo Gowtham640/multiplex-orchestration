@@ -34,9 +34,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ shows: data })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
@@ -106,9 +107,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ show: data[0] })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
@@ -141,8 +143,9 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

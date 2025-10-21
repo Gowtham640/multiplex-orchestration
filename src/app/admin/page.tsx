@@ -35,8 +35,9 @@ export default function AdminPage() {
       const allRequests = json.requests as RequestRow[]
       setPendingRows(allRequests.filter(r => r.status === 'pending'))
       setOldRows(allRequests.filter(r => r.status === 'approved' || r.status === 'rejected'))
-    } catch (e: any) {
-      setError(e.message || 'Error')
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Error'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -57,8 +58,9 @@ export default function AdminPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed')
       await load()
-    } catch (e: any) {
-      setError(e.message || 'Action failed')
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Action failed'
+      setError(errorMessage)
     }
   }
 

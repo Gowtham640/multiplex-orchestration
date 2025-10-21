@@ -88,8 +88,9 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
       setMessage('Request submitted successfully.');
       setStep(1);
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
