@@ -22,8 +22,10 @@ type Movie = {
 export default function HomePage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     loadMovies();
   }, []);
 
@@ -44,6 +46,17 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white p-8 sm:p-12">
+        <div className="mx-auto max-w-6xl">
+          <h1 className="text-2xl font-semibold">Available Movies & Shows</h1>
+          <p className="mt-1 text-sm text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white p-8 sm:p-12">

@@ -28,8 +28,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     async function loadProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
@@ -94,6 +96,17 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white p-8 sm:p-12">
+        <div className="mx-auto w-full max-w-2xl">
+          <h1 className="text-2xl font-semibold">Register your theatre</h1>
+          <p className="mt-1 text-sm text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
