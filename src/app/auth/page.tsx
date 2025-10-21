@@ -11,8 +11,10 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const m = params.get('mode');
     if (m === 'signin' || m === 'signup') setMode(m);
     const code = params.get('code');
@@ -80,6 +82,16 @@ export default function AuthPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-8 sm:p-20">
+        <div className="w-full max-w-sm rounded-xl bg-neutral-900 p-6 text-white shadow-lg">
+          <p className="text-center text-neutral-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

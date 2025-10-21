@@ -47,9 +47,11 @@ export default function ManagementDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setMounted(true);
     async function checkAccess() {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -95,6 +97,16 @@ export default function ManagementDashboardPage() {
     { key: 'settings', label: 'Profile & Settings' },
     { key: 'support', label: 'Support' },
   ], []);
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white">
+        <div className="flex items-center justify-center min-h-screen">
+          <p className="text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">

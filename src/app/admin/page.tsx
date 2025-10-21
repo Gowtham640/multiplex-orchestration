@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [oldRows, setOldRows] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   async function load() {
     setError(null)
@@ -43,7 +44,21 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    setMounted(true)
+    load()
+  }, [])
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white p-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <h1 className="text-2xl font-semibold">Admin – Requests</h1>
+          <p className="mt-1 text-sm text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    )
+  }
 
   async function handleAction(id: string, action: 'approve' | 'reject') {
     try {
