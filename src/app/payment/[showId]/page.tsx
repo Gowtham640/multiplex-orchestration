@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "../../lib/supabaseclient";
 import type { Session } from "@supabase/supabase-js";
 import { generateQrCode } from "../../lib/qrService";
@@ -328,10 +329,13 @@ function PaymentPageContent() {
                       </div>
                     ) : qrCodeImage ? (
                       <>
-                        <img
+                        <Image
                           src={`data:image/png;base64,${qrCodeImage}`}
                           alt="UPI Payment QR Code"
+                          width={192}
+                          height={192}
                           className="w-48 h-48 mx-auto mb-4"
+                          unoptimized
                         />
                         <div className="text-xs text-neutral-400 mb-2">
                           Amount: ₹{show ? (show.ticket_price * seats.length).toFixed(2) : '0.00'}

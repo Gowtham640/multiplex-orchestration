@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "../lib/supabaseclient";
 import type { Session } from "@supabase/supabase-js";
 import { generateQrCode } from "../lib/qrService";
@@ -291,10 +292,13 @@ function BookingsPageContent() {
                       
                       {qrCodes.has(booking.show_id) && (
                         <div className="flex flex-col items-center">
-                          <img
+                          <Image
                             src={`data:image/png;base64,${qrCodes.get(booking.show_id)}`}
                             alt="Ticket QR Code"
+                            width={192}
+                            height={192}
                             className="w-48 h-48 bg-white p-2 rounded-lg"
+                            unoptimized
                           />
                           <p className="text-xs text-neutral-500 mt-2">Scan for ticket verification</p>
                         </div>
@@ -302,7 +306,7 @@ function BookingsPageContent() {
                       
                       {!qrCodes.has(booking.show_id) && !loadingQr.has(booking.show_id) && (
                         <div className="text-xs text-neutral-500 text-center py-4">
-                          Click "Generate QR Code" to create your ticket QR code
+                          Click &quot;Generate QR Code&quot; to create your ticket QR code
                         </div>
                       )}
                     </div>

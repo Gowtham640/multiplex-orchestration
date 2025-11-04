@@ -120,7 +120,7 @@ export async function GET() {
 
     // Sort shows by date and time for each movie
     movieMap.forEach(movie => {
-      movie.shows.sort((a, b) => {
+      movie.shows.sort((a: { show_date: string; start_time: string }, b: { show_date: string; start_time: string }) => {
         if (a.show_date !== b.show_date) {
           return a.show_date.localeCompare(b.show_date)
         }

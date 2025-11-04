@@ -59,13 +59,15 @@ export async function GET(req: Request) {
     // Group bookings by show_id for better display
     const groupedBookings = new Map()
     
-    bookings?.forEach((booking: {
+    type BookingRow = {
       id: number;
       row_number: number;
       col_number: number;
       booked_at: string;
       show_id: number;
-      shows: {
+      theatre_id: string;
+      screen_id: number;
+      shows: Array<{
         id: number;
         movie_name: string;
         language: string;
@@ -73,30 +75,36 @@ export async function GET(req: Request) {
         start_time: string;
         end_time: string;
         ticket_price: number;
-      };
-      theatres: {
+      }>;
+      theatres: Array<{
         theatre_name: string;
         city: string;
         state: string;
-      };
-      screens: {
+      }>;
+      screens: Array<{
         screen_number: number;
-      };
-    }) => {
+      }>;
+    };
+    
+    (bookings as unknown as BookingRow[])?.forEach((booking) => {
       const showId = booking.show_id.toString()
+      const show = Array.isArray(booking.shows) ? booking.shows[0] : booking.shows
+      const theatre = Array.isArray(booking.theatres) ? booking.theatres[0] : booking.theatres
+      const screen = Array.isArray(booking.screens) ? booking.screens[0] : booking.screens
+      
       if (!groupedBookings.has(showId)) {
         groupedBookings.set(showId, {
           show_id: booking.show_id,
-          movie_name: booking.shows.movie_name,
-          language: booking.shows.language,
-          show_date: booking.shows.show_date,
-          start_time: booking.shows.start_time,
-          end_time: booking.shows.end_time,
-          ticket_price: booking.shows.ticket_price,
-          theatre_name: booking.theatres.theatre_name,
-          city: booking.theatres.city,
-          state: booking.theatres.state,
-          screen_number: booking.screens.screen_number,
+          movie_name: show.movie_name,
+          language: show.language,
+          show_date: show.show_date,
+          start_time: show.start_time,
+          end_time: show.end_time,
+          ticket_price: show.ticket_price,
+          theatre_name: theatre.theatre_name,
+          city: theatre.city,
+          state: theatre.state,
+          screen_number: screen.screen_number,
           booked_at: booking.booked_at,
           seats: [],
           total_amount: 0
@@ -109,7 +117,7 @@ export async function GET(req: Request) {
         row_number: booking.row_number,
         col_number: booking.col_number
       })
-      bookingGroup.total_amount += booking.shows.ticket_price
+      bookingGroup.total_amount += show.ticket_price
     })
 
     // Convert map to array
