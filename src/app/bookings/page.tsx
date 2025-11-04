@@ -112,25 +112,11 @@ function BookingsPageContent() {
     try {
       setLoadingQr(prev => new Set(prev).add(bookingKey));
       
-      // Get user info from session for customer name
-      const userEmail = session?.user?.email || 'Guest';
-      const userName = session?.user?.user_metadata?.name || userEmail;
-      
-      // Format ticket data as JSON string
-      const ticketData = JSON.stringify({
-        bookingId: `${booking.show_id}-${booking.seats[0]?.id || ''}`,
-        movieName: booking.movie_name,
-        showTime: `${booking.show_date}T${booking.start_time}`,
-        seats: booking.seats.map(seat => `${getRowLabel(seat.row_number)}${seat.col_number + 1}`),
-        totalPrice: booking.total_amount,
-        theatreName: booking.theatre_name,
-        screenNumber: booking.screen_number,
-        city: booking.city,
-        state: booking.state,
-        customerName: userName
-      });
+      // Generate ticket URL instead of JSON data
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const ticketUrl = `${baseUrl}/ticket/${booking.show_id}`;
 
-      const qrImage = await generateQrCode(ticketData);
+      const qrImage = await generateQrCode(ticketUrl);
       setQrCodes(prev => new Map(prev).set(bookingKey, qrImage));
     } catch (err) {
       console.error('Error generating QR code:', err);
