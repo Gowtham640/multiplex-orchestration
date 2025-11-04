@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [oldRows, setOldRows] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   async function load() {
     setError(null)
@@ -35,14 +36,29 @@ export default function AdminPage() {
       const allRequests = json.requests as RequestRow[]
       setPendingRows(allRequests.filter(r => r.status === 'pending'))
       setOldRows(allRequests.filter(r => r.status === 'approved' || r.status === 'rejected'))
-    } catch (e: any) {
-      setError(e.message || 'Error')
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Error'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    setMounted(true)
+    load()
+  }, [])
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white p-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <h1 className="text-2xl font-semibold">Admin – Requests</h1>
+          <p className="mt-1 text-sm text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    )
+  }
 
   async function handleAction(id: string, action: 'approve' | 'reject') {
     try {
@@ -57,8 +73,9 @@ export default function AdminPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed')
       await load()
-    } catch (e: any) {
-      setError(e.message || 'Action failed')
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Action failed'
+      setError(errorMessage)
     }
   }
 

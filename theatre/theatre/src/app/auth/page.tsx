@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabaseclient";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -11,8 +11,10 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const m = params.get('mode');
     if (m === 'signin' || m === 'signup') setMode(m);
     const code = params.get('code');
@@ -22,21 +24,31 @@ export default function AuthPage() {
       if (!code) return;
       try {
         setLoading(true);
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
-        // Clean the URL and move to sign-in (or redirect if you prefer)
-        window.history.replaceState({}, '', '/auth?mode=signin');
+        // Get redirect parameter if present
+        const redirect = params.get('redirect');
+        const redirectUrl = redirect ? `/auth?mode=signin&redirect=${encodeURIComponent(redirect)}` : '/auth?mode=signin';
+        window.history.replaceState({}, '', redirectUrl);
         setMessage(type === 'signup' ? 'Email confirmed. You can now sign in.' : 'You are signed in.');
         setMode('signin');
-      } catch (e: any) {
+        // If already signed in after email confirmation, redirect
+        if (type === 'signup') {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && redirect) {
+            setTimeout(() => router.push(redirect), 1500);
+          }
+        }
+      } catch (e: unknown) {
         // If exchange fails, keep them on sign-in with an info message
-        setError(e?.message || 'Could not verify email link. Try signing in.');
+        const errorMessage = e instanceof Error ? e.message : 'Could not verify email link. Try signing in.'
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
     }
     handleExchange();
-  }, [params]);
+  }, [params, router]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -71,13 +83,26 @@ export default function AuthPage() {
         if (json.session) {
           await supabase.auth.setSession({ access_token: json.session.access_token, refresh_token: json.session.refresh_token });
         }
-        router.push('/home');
+        // Check for redirect parameter
+        const redirect = params.get('redirect');
+        router.push(redirect || '/home');
       }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-8 sm:p-20">
+        <div className="w-full max-w-sm rounded-xl bg-neutral-900 p-6 text-white shadow-lg">
+          <p className="text-center text-neutral-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -161,7 +186,7 @@ export default function AuthPage() {
         <p className="mt-4 text-center text-sm text-neutral-400">
           {mode === 'signin' ? (
             <>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button type="button" className="underline" onClick={() => setMode('signup')}>Sign up</button>
             </>
           ) : (
@@ -173,5 +198,19 @@ export default function AuthPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-8 sm:p-20">
+        <div className="w-full max-w-sm rounded-xl bg-neutral-900 p-6 text-white shadow-lg">
+          <p className="text-center text-neutral-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AuthForm />
+    </Suspense>
   );
 }

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization') || ''
@@ -32,9 +32,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ screens: data })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
@@ -74,9 +75,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ screen: data[0] })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
@@ -110,8 +112,9 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Unexpected error:', e)
-    return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

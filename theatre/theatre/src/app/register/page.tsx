@@ -28,8 +28,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     async function loadProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
@@ -88,11 +90,23 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
       setMessage('Request submitted successfully.');
       setStep(1);
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white p-8 sm:p-12">
+        <div className="mx-auto w-full max-w-2xl">
+          <h1 className="text-2xl font-semibold">Register your theatre</h1>
+          <p className="mt-1 text-sm text-neutral-400">Loading...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
