@@ -3,11 +3,11 @@ create table public.users (
   name text not null,
   mail text not null,
   role text not null default 'public'::text,
+  points smallint null,
   constraint users_pkey primary key (id),
   constraint users_mail_key unique (mail),
   constraint users_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
 RLS Policies: 
 1. Anon users can insert(supabase template one)
 2. User can only see their data(supabase template one)
@@ -100,4 +100,19 @@ create table public.bookings (
 ) TABLESPACE pg_default;
 
 no rls
+CREATE TABLE public.parking_reservations (
+  id SERIAL NOT NULL,
+  theatre_id UUID NOT NULL,
+  user_id UUID NOT NULL,
+  floor_number INTEGER NOT NULL,
+  slot_number INTEGER NOT NULL,
+  is_reserved BOOLEAN DEFAULT TRUE,
+  reserved_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+  CONSTRAINT parking_reservations_pkey PRIMARY KEY (id),
+  CONSTRAINT parking_reservations_theatre_id_fkey FOREIGN KEY (theatre_id)
+    REFERENCES theatres (id) ON DELETE CASCADE,
+  CONSTRAINT parking_reservations_user_id_fkey FOREIGN KEY (user_id)
+    REFERENCES users (id) ON DELETE CASCADE
+) TABLESPACE pg_default;
 
+no rls

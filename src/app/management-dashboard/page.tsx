@@ -9,12 +9,29 @@ type TabKey =
   | 'overview'
   | 'movies'
   | 'screens'
+  | 'parkings'
   | 'bookings'
   | 'revenue'
   | 'feedback'
   | 'notifications'
   | 'settings'
   | 'support';
+
+type Parking = {
+  id: number;
+  floor_number: number;
+  total_rows: number;
+  total_columns: number;
+  removed: Set<string>;
+  history: string[];
+};
+
+type ScreenApiResponse = {
+  id: number;
+  screen_number: number;
+  total_rows: number;
+  total_columns: number;
+};
 
 type Screen = {
   id: number;
@@ -90,6 +107,7 @@ export default function ManagementDashboardPage() {
     { key: 'overview', label: 'Dashboard' },
     { key: 'movies', label: 'Movies / Shows' },
     { key: 'screens', label: 'Screens' },
+    { key: 'parkings', label: 'Parkings' },
     { key: 'bookings', label: 'Bookings' },
     { key: 'revenue', label: 'Revenue' },
     { key: 'feedback', label: 'Feedback' },
@@ -160,6 +178,7 @@ export default function ManagementDashboardPage() {
             {active === 'overview' && <Overview />}
             {active === 'movies' && <MoviesShows session={session} />}
             {active === 'screens' && <ScreensSetup session={session} />}
+            {active === 'parkings' && <ParkingsSetup session={session} />}
             {active === 'bookings' && <Bookings />}
             {active === 'revenue' && <Revenue />}
             {active === 'feedback' && <Feedback />}
@@ -503,7 +522,7 @@ function ScreensSetup({ session }: { session: Session | null }) {
       });
       if (res.ok) {
         const { screens: data } = await res.json();
-        setScreens(data.map((s: Screen) => ({ 
+        setScreens(data.map((s: ScreenApiResponse) => ({ 
           ...s, 
           removed: new Set(), 
           history: [] 
@@ -703,6 +722,208 @@ function Seat({ removed, onRemove }: { removed: boolean; onRemove: () => void })
         <span className="pointer-events-none absolute inset-0 hidden items-center justify-center text-[10px] text-white group-hover:flex">×</span>
       )}
     </button>
+  );
+}
+
+// 3.5) Parkings Setup
+function ParkingsSetup({ session }: { session: Session | null }) {
+  const [parkings, setParkings] = useState<Parking[]>([]);
+  const [newParking, setNewParking] = useState({ floor_number: 1, rows: 10, cols: 20 });
+  const [loading, setLoading] = useState(false);
+
+  const loadParkings = useCallback(async () => {
+    if (!session?.access_token) return;
+    
+    try {
+      const res = await fetch('/api/parkings', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const { parkings: data } = await res.json();
+        setParkings(data.map((p: Parking) => ({ 
+          ...p, 
+          removed: new Set(), 
+          history: [] 
+        })));
+      }
+    } catch (e) {
+      console.error('Failed to load parkings:', e);
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    if (session) {
+      loadParkings();
+    }
+  }, [session, loadParkings]);
+
+  const addParking = async () => {
+    if (!newParking.floor_number || !newParking.rows || !newParking.cols) return;
+    if (!session?.access_token) {
+      alert('Session expired. Please refresh the page.');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const res = await fetch('/api/parkings', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          floor_number: newParking.floor_number,
+          total_rows: newParking.rows,
+          total_columns: newParking.cols,
+        }),
+      });
+
+      if (res.ok) {
+        const { parking } = await res.json();
+        setParkings(prev => [...prev, { 
+          ...parking, 
+          removed: new Set(), 
+          history: [] 
+        }]);
+        setNewParking({ floor_number: Math.max(...parkings.map(p => p.floor_number), 0) + 1, rows: 10, cols: 20 });
+      } else {
+        const { error } = await res.json();
+        alert(`Failed to add parking: ${error}`);
+      }
+    } catch (e) {
+      console.error('Failed to add parking:', e);
+      alert('Failed to add parking');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteParking = async (id: number) => {
+    if (!confirm('Delete this parking floor?')) return;
+    if (!session?.access_token) {
+      alert('Session expired. Please refresh the page.');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/parkings', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        setParkings(prev => prev.filter(p => p.id !== id));
+      } else {
+        const { error } = await res.json();
+        alert(`Failed to delete parking: ${error}`);
+      }
+    } catch (e) {
+      console.error('Failed to delete parking:', e);
+      alert('Failed to delete parking');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card title="Add / Edit Parking Floor">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <Field label="Floor Number">
+            <Input 
+              type="number" 
+              value={newParking.floor_number} 
+              onChange={(e) => setNewParking({ ...newParking, floor_number: Number(e.target.value) })} 
+              placeholder="1" 
+            />
+          </Field>
+          <Field label="Rows">
+            <Input type="number" value={newParking.rows} onChange={(e) => setNewParking({ ...newParking, rows: Number(e.target.value) })} />
+          </Field>
+          <Field label="Columns">
+            <Input type="number" value={newParking.cols} onChange={(e) => setNewParking({ ...newParking, cols: Number(e.target.value) })} />
+          </Field>
+          <div className="flex items-end">
+            <button
+              className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
+              onClick={addParking}
+              disabled={loading}
+            >
+              {loading ? 'Adding...' : 'Add Parking'}
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Define Parking Layout (preview)">
+        {parkings.length === 0 && <div className="text-sm text-neutral-400">No parking floors yet. Add one above.</div>}
+        <div className="space-y-4">
+          {parkings.map(p => (
+            <div key={p.id} className="rounded-md bg-neutral-800 p-3">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <div className="font-medium">Floor {p.floor_number}</div>
+                <div className="flex items-center gap-2 text-neutral-400">
+                  <span>{p.total_rows} x {p.total_columns}</span>
+                  <button
+                    className="rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200"
+                    onClick={() => setParkings(prev => prev.map(x => x.id === p.id ? { ...x, removed: new Set(), history: [] } : x))}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    className="rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200 disabled:opacity-50"
+                    disabled={p.history.length === 0}
+                    onClick={() => setParkings(prev => prev.map(x => {
+                      if (x.id !== p.id) return x;
+                      const history = [...x.history];
+                      const last = history.pop();
+                      if (!last) return x;
+                      const removed = new Set(x.removed);
+                      removed.delete(last);
+                      return { ...x, removed, history };
+                    }))}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    className="rounded bg-red-600 px-2 py-1 text-xs text-neutral-200"
+                    onClick={() => deleteParking(p.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-auto rounded border border-neutral-700">
+                <div className="inline-block bg-neutral-900 p-2">
+                  {Array.from({ length: p.total_rows }).map((_, r) => (
+                    <div key={r} className="flex">
+                      {Array.from({ length: p.total_columns }).map((_, c) => (
+                        <Seat
+                          key={c}
+                          removed={p.removed.has(`${r}-${c}`)}
+                          onRemove={() => setParkings(prev => prev.map(x => {
+                            if (x.id !== p.id) return x;
+                            const id = `${r}-${c}`;
+                            if (x.removed.has(id)) return x;
+                            const removed = new Set(x.removed);
+                            removed.add(id);
+                            const history = [...x.history, id];
+                            return { ...x, removed, history };
+                          }))}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
 

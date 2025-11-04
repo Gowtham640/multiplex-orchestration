@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "../../lib/supabaseclient";
 import type { Session } from "@supabase/supabase-js";
 import { generateQrCode } from "../../lib/qrService";
@@ -55,6 +56,10 @@ function PaymentPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
+  const [userPoints, setUserPoints] = useState<number>(0);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState<number>(0);
+  const [loadingPoints, setLoadingPoints] = useState(false);
 
   const loadSession = useCallback(async () => {
     try {
@@ -95,6 +100,34 @@ function PaymentPageContent() {
     loadSession();
   }, [loadSession]);
 
+  const loadUserPoints = useCallback(async () => {
+    if (!session?.access_token) return;
+    
+    try {
+      setLoadingPoints(true);
+      const res = await fetch('/api/user/points', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setUserPoints(data.points || 0);
+      }
+    } catch (e) {
+      console.error('Error loading user points:', e);
+    } finally {
+      setLoadingPoints(false);
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    if (session && mounted) {
+      loadUserPoints();
+    }
+  }, [session, mounted, loadUserPoints]);
+
   useEffect(() => {
     if (showId && mounted) {
       loadShowDetails();
@@ -111,6 +144,18 @@ function PaymentPageContent() {
     }
   }, [showId, mounted, searchParams, loadShowDetails]);
 
+  // Update points to use when usePoints changes
+  useEffect(() => {
+    if (!show) return;
+    const totalAmount = show.ticket_price * seats.length;
+    if (usePoints) {
+      const maxPoints = Math.min(userPoints, totalAmount);
+      setPointsToUse(maxPoints);
+    } else {
+      setPointsToUse(0);
+    }
+  }, [usePoints, userPoints, show, seats]);
+
   const getRowLabel = (row: number): string => {
     return String.fromCharCode(65 + row); // A, B, C, etc.
   };
@@ -122,34 +167,40 @@ function PaymentPageContent() {
       setLoadingQr(true);
       
       const totalAmount = show.ticket_price * seats.length;
+      const finalAmount = Math.max(0, totalAmount - pointsToUse);
       
-      // Build UPI payment link with pre-filled amount
-      const upiParams = new URLSearchParams({
-        pa: 'grizigowtham@oksbi',
-        pn: 'Gowtham Ramakrishna Rayapureddi',
-        am: totalAmount.toFixed(2),
-        cu: 'INR',
-        aid: 'uGICAgIDjkPzTJw'
-      });
-      
-      const upiLink = `upi://pay?${upiParams.toString()}`;
-      
-      // Generate QR code from UPI link
-      const qrImage = await generateQrCode(upiLink);
-      setQrCodeImage(qrImage);
+      // Build UPI payment link with pre-filled amount (only if there's an amount to pay)
+      if (finalAmount > 0) {
+        const upiParams = new URLSearchParams({
+          pa: 'grizigowtham@oksbi',
+          pn: 'Gowtham Ramakrishna Rayapureddi',
+          am: finalAmount.toFixed(2),
+          cu: 'INR',
+          aid: 'uGICAgIDjkPzTJw'
+        });
+        
+        const upiLink = `upi://pay?${upiParams.toString()}`;
+        
+        // Generate QR code from UPI link
+        const qrImage = await generateQrCode(upiLink);
+        setQrCodeImage(qrImage);
+      } else {
+        // If using points covers the full amount, no QR code needed
+        setQrCodeImage(null);
+      }
     } catch (err) {
       console.error('Error generating UPI QR code:', err);
       setError('Failed to generate payment QR code');
     } finally {
       setLoadingQr(false);
     }
-  }, [show, seats]);
+  }, [show, seats, pointsToUse]);
 
   useEffect(() => {
     if (show && seats.length > 0 && mounted) {
       generateUpiQrCode();
     }
-  }, [show, seats, mounted, generateUpiQrCode]);
+  }, [show, seats, mounted, pointsToUse, generateUpiQrCode]);
 
   const handleConfirmPayment = async () => {
     if (!session || !showId || seats.length === 0) {
@@ -168,7 +219,11 @@ function PaymentPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ show_id: parseInt(showId), seats })
+        body: JSON.stringify({ 
+          show_id: parseInt(showId), 
+          seats,
+          points_used: usePoints ? pointsToUse : 0
+        })
       });
 
       if (!res.ok) {
@@ -243,6 +298,8 @@ function PaymentPageContent() {
   }
 
   const totalAmount = show.ticket_price * seats.length;
+  const finalAmount = Math.max(0, totalAmount - pointsToUse);
+  const pointsToAward = Math.floor(finalAmount);
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white p-4 sm:p-8">
@@ -306,6 +363,28 @@ function PaymentPageContent() {
                     <span className="text-lg font-semibold">Total Amount</span>
                     <span className="text-xl font-bold text-green-400">₹{totalAmount}</span>
                   </div>
+                  {usePoints && pointsToUse > 0 && (
+                    <>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-sm text-neutral-400">Points Used</span>
+                        <span className="font-semibold text-yellow-400">-{pointsToUse} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-neutral-800">
+                        <span className="text-lg font-semibold">Final Amount</span>
+                        <span className="text-xl font-bold text-green-400">₹{finalAmount}</span>
+                      </div>
+                      {finalAmount > 0 && (
+                        <div className="text-xs text-neutral-500 mt-1">
+                          You&apos;ll earn {pointsToAward} points after this purchase
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!usePoints && (
+                    <div className="text-xs text-neutral-500 mt-2">
+                      You&apos;ll earn {pointsToAward} points after this purchase
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -317,7 +396,55 @@ function PaymentPageContent() {
               <h2 className="text-lg font-semibold mb-4">Payment Method</h2>
               
               <div className="space-y-4">
+                {/* Points Section */}
+                <div className="rounded-lg bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-800/50 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-sm font-semibold text-purple-300">Your Points</div>
+                      <div className="text-2xl font-bold text-purple-400">{loadingPoints ? '...' : userPoints.toLocaleString()}</div>
+                    </div>
+                    <div className="text-xs text-neutral-400">
+                      1 point = ₹1
+                    </div>
+                  </div>
+                  
+                  {userPoints > 0 && (
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => setUsePoints(e.target.checked)}
+                          className="rounded border-neutral-600 bg-neutral-800 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-neutral-300">Use points for this purchase</span>
+                      </label>
+                      
+                      {usePoints && (
+                        <div className="mt-2 space-y-2">
+                          <div className="text-xs text-neutral-400">
+                            Using {pointsToUse} points ({Math.min(pointsToUse, totalAmount)}₹ discount)
+                          </div>
+                          {finalAmount === 0 && (
+                            <div className="text-xs text-green-400 font-semibold">
+                              ✓ Points cover the full amount! No payment needed.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {userPoints === 0 && !loadingPoints && (
+                    <div className="text-xs text-neutral-500 mt-2">
+                      Start earning points with your first purchase!
+                    </div>
+                  )}
+                </div>
+
                 {/* UPI Payment QR Code */}
+                {finalAmount > 0 && (
+                <>
                 <div className="bg-white rounded-lg p-6 flex items-center justify-center">
                   <div className="text-center">
                     {loadingQr ? (
@@ -328,13 +455,16 @@ function PaymentPageContent() {
                       </div>
                     ) : qrCodeImage ? (
                       <>
-                        <img
+                        <Image
                           src={`data:image/png;base64,${qrCodeImage}`}
                           alt="UPI Payment QR Code"
+                          width={192}
+                          height={192}
                           className="w-48 h-48 mx-auto mb-4"
+                          unoptimized
                         />
                         <div className="text-xs text-neutral-400 mb-2">
-                          Amount: ₹{show ? (show.ticket_price * seats.length).toFixed(2) : '0.00'}
+                          Amount: ₹{finalAmount.toFixed(2)}
                         </div>
                       </>
                     ) : (
@@ -367,7 +497,7 @@ function PaymentPageContent() {
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-green-400">✓</span>
-                    <span>Enter amount: ₹{totalAmount}</span>
+                    <span>Enter amount: ₹{finalAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-green-400">✓</span>
@@ -383,10 +513,12 @@ function PaymentPageContent() {
                       UPI ID: <span className="font-mono">theatre@payments</span>
                     </div>
                     <div className="text-sm text-neutral-300">
-                      Amount: <span className="font-semibold text-green-400">₹{totalAmount}</span>
+                      Amount: <span className="font-semibold text-green-400">₹{finalAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
+                </>
+                )}
 
                 {/* Confirm Payment Button */}
                 <button
@@ -394,7 +526,7 @@ function PaymentPageContent() {
                   disabled={processing}
                   className="w-full rounded-md bg-green-600 px-4 py-3 font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {processing ? 'Processing...' : 'Confirm Payment'}
+                  {processing ? 'Processing...' : finalAmount === 0 ? 'Confirm Booking' : 'Confirm Payment'}
                 </button>
 
                 <p className="text-xs text-center text-neutral-400">
@@ -422,4 +554,3 @@ export default function PaymentPage() {
     </Suspense>
   );
 }
-

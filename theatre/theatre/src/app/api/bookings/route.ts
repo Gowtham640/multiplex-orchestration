@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization') || ''
@@ -145,10 +146,16 @@ export async function POST(req: Request) {
     const userId = user.user?.id
     if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
 
-    const { show_id, seats } = await req.json()
+    const { show_id, seats, points_used } = await req.json()
 
     if (!show_id || !seats || !Array.isArray(seats) || seats.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Validate points_used if provided
+    const pointsToUse = Math.max(0, Math.floor(points_used || 0))
+    if (pointsToUse < 0) {
+      return NextResponse.json({ error: 'Invalid points amount' }, { status: 400 })
     }
 
     // Get show details to verify and get theatre_id, screen_id
@@ -222,9 +229,82 @@ export async function POST(req: Request) {
 
     const totalAmount = show.ticket_price * seats.length
 
+    // Get user's current points
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('points')
+      .eq('id', userId)
+      .single()
+
+    if (userError) {
+      console.error('Error fetching user points:', userError)
+      return NextResponse.json({ error: 'Failed to fetch user points' }, { status: 400 })
+    }
+
+    const currentPoints = userData?.points || 0
+
+    // Validate points if user wants to use them
+    if (pointsToUse > 0) {
+      if (pointsToUse > currentPoints) {
+        return NextResponse.json({ 
+          error: `Insufficient points. You have ${currentPoints} points, but trying to use ${pointsToUse}` 
+        }, { status: 400 })
+      }
+
+      if (pointsToUse > totalAmount) {
+        return NextResponse.json({ 
+          error: `Cannot use more points than the total amount (₹${totalAmount})` 
+        }, { status: 400 })
+      }
+    }
+
+    // Calculate final amount after points deduction
+    const finalAmount = Math.max(0, totalAmount - pointsToUse)
+
+    // Calculate points to award (1 point per rupee spent)
+    const pointsToAward = Math.floor(finalAmount)
+
+    // Update user points: deduct used points and add earned points
+    const newPoints = currentPoints - pointsToUse + pointsToAward
+
+    // Ensure points value is within smallint range (but allow it to be larger if needed)
+    const clampedPoints = Math.min(newPoints, 32767) // smallint max value
+
+    // Use service role key to bypass RLS for points update
+    const supabaseAdmin = supabaseServiceKey
+      ? createClient(supabaseUrl, supabaseServiceKey)
+      : supabase
+
+    const { data: updatedUser, error: pointsUpdateError } = await supabaseAdmin
+      .from('users')
+      .update({ points: clampedPoints })
+      .eq('id', userId)
+      .select('points')
+      .single()
+
+    if (pointsUpdateError) {
+      console.error('Error updating user points:', pointsUpdateError)
+      return NextResponse.json({ 
+        error: `Failed to update points: ${pointsUpdateError.message}` 
+      }, { status: 400 })
+    }
+
+    if (!updatedUser) {
+      console.error('Points update succeeded but no data returned')
+      return NextResponse.json({ 
+        error: 'Failed to verify points update' 
+      }, { status: 400 })
+    }
+
+    console.log(`Points updated successfully: ${currentPoints} -> ${updatedUser.points} (requested: ${newPoints})`)
+
     return NextResponse.json({
       bookings: insertedBookings,
       total_amount: totalAmount,
+      final_amount: finalAmount,
+      points_used: pointsToUse,
+      points_awarded: pointsToAward,
+      points_balance: updatedUser.points,
       seats_booked: seats.length
     })
   } catch (e: unknown) {
