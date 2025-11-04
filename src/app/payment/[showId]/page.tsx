@@ -126,7 +126,7 @@ function PaymentPageContent() {
       
       // Build UPI payment link with pre-filled amount
       const upiParams = new URLSearchParams({
-        pa: 'grizigowtham@okhdfcbank',
+        pa: 'grizigowtham@oksbi',
         pn: 'Gowtham Ramakrishna Rayapureddi',
         am: totalAmount.toFixed(2),
         cu: 'INR',
@@ -348,7 +348,7 @@ function PaymentPageContent() {
                           <div>QR Code</div>
                           <div className="mt-2 text-[10px]">Scan to Pay</div>
                           <div className="mt-1 text-[8px] text-neutral-500">
-                            UPI ID: grizigowtham@okhdfcbank
+                            UPI ID: grizigowtham@oksbi
                           </div>
                         </div>
                       </div>
