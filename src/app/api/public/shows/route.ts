@@ -58,7 +58,7 @@ export async function GET() {
     const theatresMap = new Map(theatresData?.map(t => [t.id, t]) || [])
     const screensMap = new Map(screensData?.map(s => [s.id, s]) || [])
 
-    // Group shows by movie name to avoid duplicates
+    // Group shows by movie name and include all individual shows
     const movieMap = new Map()
     
     showsData.forEach(show => {
@@ -73,11 +73,11 @@ export async function GET() {
       const movieKey = show.movie_name.toLowerCase()
       if (!movieMap.has(movieKey)) {
         movieMap.set(movieKey, {
-          id: show.id,
           title: show.movie_name,
           language: show.language,
           price: show.ticket_price,
           theatres: new Set(),
+          shows: [],
           nextShow: null,
           totalShows: 0
         })
@@ -87,10 +87,27 @@ export async function GET() {
       movie.theatres.add(`${theatre.theatre_name} - ${theatre.city}`)
       movie.totalShows++
       
+      // Add individual show with all details
+      const showData = {
+        showId: show.id,
+        show_date: show.show_date,
+        start_time: show.start_time,
+        end_time: show.end_time,
+        screen: screen.screen_number,
+        screen_id: screen.id,
+        theatre: `${theatre.theatre_name} - ${theatre.city}`,
+        theatre_id: theatre.id,
+        available_seats: show.available_seats,
+        ticket_price: show.ticket_price
+      }
+      
+      movie.shows.push(showData)
+      
       // Set the earliest upcoming show
       if (!movie.nextShow || show.show_date < movie.nextShow.show_date || 
           (show.show_date === movie.nextShow.show_date && show.start_time < movie.nextShow.start_time)) {
         movie.nextShow = {
+          showId: show.id,
           show_date: show.show_date,
           start_time: show.start_time,
           end_time: show.end_time,
@@ -101,13 +118,23 @@ export async function GET() {
       }
     })
 
+    // Sort shows by date and time for each movie
+    movieMap.forEach(movie => {
+      movie.shows.sort((a, b) => {
+        if (a.show_date !== b.show_date) {
+          return a.show_date.localeCompare(b.show_date)
+        }
+        return a.start_time.localeCompare(b.start_time)
+      })
+    })
+
     // Convert to array and format for frontend
     const movies = Array.from(movieMap.values()).map(movie => ({
-      id: movie.id,
       title: movie.title,
       language: movie.language || 'N/A',
       price: movie.price,
       theatres: Array.from(movie.theatres),
+      shows: movie.shows,
       nextShow: movie.nextShow,
       totalShows: movie.totalShows
     }))

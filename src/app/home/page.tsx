@@ -1,14 +1,29 @@
 'use client'
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+type Show = {
+  showId: number;
+  show_date: string;
+  start_time: string;
+  end_time: string;
+  screen: number;
+  screen_id: number;
+  theatre: string;
+  theatre_id: string;
+  available_seats: number;
+  ticket_price: number;
+};
 
 type Movie = {
-  id: number;
   title: string;
   language: string;
   price: number;
   theatres: string[];
+  shows: Show[];
   nextShow: {
+    showId: number;
     show_date: string;
     start_time: string;
     end_time: string;
@@ -20,9 +35,11 @@ type Movie = {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [expandedMovie, setExpandedMovie] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -67,6 +84,7 @@ export default function HomePage() {
               Profile
             </summary>
             <div className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-md border border-neutral-800 bg-neutral-900 shadow-lg">
+              <a href="/bookings" className="block px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800">My Bookings</a>
               <a href="#" className="block px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800">My profile</a>
               <a href="#" className="block px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800">Settings</a>
               <a href="/register" className="block px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800">Add your theatre</a>
@@ -84,7 +102,7 @@ export default function HomePage() {
         ) : (
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {movies.map((movie) => (
-              <article key={movie.id} className="overflow-hidden rounded-lg bg-neutral-900 shadow">
+              <article key={movie.title} className="overflow-hidden rounded-lg bg-neutral-900 shadow">
                 <div className="relative aspect-[2/3] w-full bg-neutral-800">
                   <Image
                     src="/window.svg"
@@ -126,10 +144,40 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-neutral-800">
-                    <div className="text-xs text-neutral-500">
+                    <div className="text-xs text-neutral-500 mb-2">
                       {movie.totalShows} show{movie.totalShows !== 1 ? 's' : ''} scheduled
                     </div>
+                    <button
+                      onClick={() => setExpandedMovie(expandedMovie === movie.title ? null : movie.title)}
+                      className="w-full rounded-md bg-neutral-800 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-700 transition-colors"
+                    >
+                      {expandedMovie === movie.title ? 'Hide Shows' : 'View All Shows'}
+                    </button>
                   </div>
+                  
+                  {expandedMovie === movie.title && (
+                    <div className="mt-3 pt-3 border-t border-neutral-800 space-y-2 max-h-64 overflow-y-auto">
+                      {movie.shows.map((show) => (
+                        <button
+                          key={show.showId}
+                          onClick={() => router.push(`/booking/${show.showId}`)}
+                          className="w-full text-left rounded-md bg-neutral-800 p-3 hover:bg-neutral-700 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{show.theatre}</span>
+                            <span className="text-xs text-green-400">₹{show.ticket_price}</span>
+                          </div>
+                          <div className="text-xs text-neutral-400 space-y-0.5">
+                            <div>Screen {show.screen}</div>
+                            <div>{new Date(show.show_date).toLocaleDateString()} • {show.start_time} - {show.end_time}</div>
+                            <div className={show.available_seats > 10 ? 'text-green-400' : 'text-red-400'}>
+                              {show.available_seats} seats available
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </article>
             ))}

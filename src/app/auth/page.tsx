@@ -26,10 +26,19 @@ function AuthForm() {
         setLoading(true);
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
-        // Clean the URL and move to sign-in (or redirect if you prefer)
-        window.history.replaceState({}, '', '/auth?mode=signin');
+        // Get redirect parameter if present
+        const redirect = params.get('redirect');
+        const redirectUrl = redirect ? `/auth?mode=signin&redirect=${encodeURIComponent(redirect)}` : '/auth?mode=signin';
+        window.history.replaceState({}, '', redirectUrl);
         setMessage(type === 'signup' ? 'Email confirmed. You can now sign in.' : 'You are signed in.');
         setMode('signin');
+        // If already signed in after email confirmation, redirect
+        if (type === 'signup') {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && redirect) {
+            setTimeout(() => router.push(redirect), 1500);
+          }
+        }
       } catch (e: unknown) {
         // If exchange fails, keep them on sign-in with an info message
         const errorMessage = e instanceof Error ? e.message : 'Could not verify email link. Try signing in.'
@@ -39,7 +48,7 @@ function AuthForm() {
       }
     }
     handleExchange();
-  }, [params]);
+  }, [params, router]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -74,7 +83,9 @@ function AuthForm() {
         if (json.session) {
           await supabase.auth.setSession({ access_token: json.session.access_token, refresh_token: json.session.refresh_token });
         }
-        router.push('/home');
+        // Check for redirect parameter
+        const redirect = params.get('redirect');
+        router.push(redirect || '/home');
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
