@@ -5,22 +5,31 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY! // must exist
+
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization') || ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    })
+    // Use SERVICE ROLE key here, not anon key
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: user } = await supabase.auth.getUser()
-    const userId = user.user?.id
-    if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    // Verify token and get user
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    if (userError || !user) {
+      console.error("Auth error:", userError)
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
 
-    // Get all bookings for the user with show, theatre, and screen details
-    const { data: bookings, error } = await supabase
+    const userId = user.id
+
+    const { data: bookings, error } = await supabaseAdmin
       .from('bookings')
       .select(`
         id,
@@ -57,42 +66,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    // Group bookings by show_id for better display
+    // Group bookings as before
     const groupedBookings = new Map()
-    
-    type BookingRow = {
-      id: number;
-      row_number: number;
-      col_number: number;
-      booked_at: string;
-      show_id: number;
-      theatre_id: string;
-      screen_id: number;
-      shows: Array<{
-        id: number;
-        movie_name: string;
-        language: string;
-        show_date: string;
-        start_time: string;
-        end_time: string;
-        ticket_price: number;
-      }>;
-      theatres: Array<{
-        theatre_name: string;
-        city: string;
-        state: string;
-      }>;
-      screens: Array<{
-        screen_number: number;
-      }>;
-    };
-    
-    (bookings as unknown as BookingRow[])?.forEach((booking) => {
+    for (const booking of bookings ?? []) {
       const showId = booking.show_id.toString()
       const show = Array.isArray(booking.shows) ? booking.shows[0] : booking.shows
       const theatre = Array.isArray(booking.theatres) ? booking.theatres[0] : booking.theatres
       const screen = Array.isArray(booking.screens) ? booking.screens[0] : booking.screens
-      
+
       if (!groupedBookings.has(showId)) {
         groupedBookings.set(showId, {
           show_id: booking.show_id,
@@ -111,26 +92,26 @@ export async function GET(req: Request) {
           total_amount: 0
         })
       }
-      
-      const bookingGroup = groupedBookings.get(showId)
-      bookingGroup.seats.push({
+
+      const group = groupedBookings.get(showId)
+      group.seats.push({
         id: booking.id,
         row_number: booking.row_number,
         col_number: booking.col_number
       })
-      bookingGroup.total_amount += show.ticket_price
-    })
+      group.total_amount += show.ticket_price
+    }
 
-    // Convert map to array
     const bookingsList = Array.from(groupedBookings.values())
-
     return NextResponse.json({ bookings: bookingsList })
-  } catch (e: unknown) {
+
+  } catch (e) {
     console.error('Unexpected error:', e)
-    const errorMessage = e instanceof Error ? e.message : 'Unexpected error'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    const message = e instanceof Error ? e.message : 'Unexpected error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
 
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization') || ''
